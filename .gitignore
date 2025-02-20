@@ -1,4 +1,3 @@
-
 .dotbuild/
 engine/
 firefox-*/
@@ -9,3 +8,6 @@ __pycache__/
 dist/
 
 windsign-temp/
+venv/
+
+!firefox-cache/

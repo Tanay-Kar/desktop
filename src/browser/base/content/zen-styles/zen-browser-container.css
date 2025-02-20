@@ -1,14 +1,22 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 :root:not([inDOMFullscreen='true']):not([chromehidden~='location']):not([chromehidden~='toolbar']) {
   & #tabbrowser-tabbox #tabbrowser-tabpanels .browserSidebarContainer {
     width: -moz-available;
-    border-radius: var(--zen-webview-border-radius, var(--zen-border-radius));
+    border-radius: var(--zen-native-inner-radius);
     position: relative;
 
-    box-shadow: 0 0 1px 1px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.5));
-    
-    & .browserContainer {
-      overflow: hidden;
-      border-radius: var(--zen-webview-border-radius, var(--zen-border-radius));
+    overflow: hidden;
+
+    :root:not([zen-no-padding='true']) & {
+      box-shadow: var(--zen-big-shadow);
+    }
+
+    & browser[transparent='true'] {
+      background: rgba(255, 255, 255, 0.1);
     }
   }
 

@@ -1,4 +1,3 @@
-
 set -ex
 
 CURRENT_DIR=$(pwd)
@@ -8,8 +7,14 @@ git config --global fetch.prune true
 
 cd $CURRENT_DIR
 
+LAST_FIREFOX_L10N_COMMIT=$(cat ./firefox-cache/l10n-last-commit-hash)
+
 cd ./l10n
+rm -rf firefox-l10n
+# clone only from LAST_FIREFOX_L10N_COMMIT
 git clone https://github.com/mozilla-l10n/firefox-l10n
+cd firefox-l10n
+git checkout $LAST_FIREFOX_L10N_COMMIT
 cd $CURRENT_DIR
 
 update_language() {
@@ -32,9 +37,9 @@ cd $CURRENT_DIR
 
 # Move all the files to the correct location
 
-sh scripts/copy-language-pack.sh en-US
+python3 scripts/copy_language_pack.py en-US
 for lang in $(cat ./l10n/supported-languages); do
-  sh scripts/copy-language-pack.sh $lang
+  python3 scripts/copy_language_pack.py $lang
 done
 
 wait

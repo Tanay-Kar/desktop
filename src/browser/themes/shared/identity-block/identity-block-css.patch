@@ -1,8 +1,8 @@
 diff --git a/browser/themes/shared/identity-block/identity-block.css b/browser/themes/shared/identity-block/identity-block.css
-index cb6bb55dd3aebdaebb92c9e2cba1f2a108b4d7bb..9d5055a007c63cb779e67ae58a1d937ad2a31bfe 100644
+index 13b1659ed5a3b9bb0342b601998d0fd5c9760e22..4f13c401f23f51962986fe8caf197aa5306fc276 100644
 --- a/browser/themes/shared/identity-block/identity-block.css
 +++ b/browser/themes/shared/identity-block/identity-block.css
-@@ -70,7 +70,7 @@
+@@ -81,7 +81,7 @@
  
  #identity-box[pageproxystate="valid"]:is(.notSecureText, .chromeUI, .extensionPage) > .identity-box-button,
  #urlbar-label-box {
@@ -11,12 +11,13 @@ index cb6bb55dd3aebdaebb92c9e2cba1f2a108b4d7bb..9d5055a007c63cb779e67ae58a1d937a
    color: var(--urlbar-box-text-color);
    padding-inline: 8px;
    border-radius: var(--urlbar-icon-border-radius);
-@@ -164,16 +164,16 @@
+@@ -175,16 +175,17 @@
    }
  
    #identity-icon {
 -    list-style-image: url(chrome://global/skin/icons/search-glass.svg);
 +    list-style-image: url(chrome://global/skin/icons/search-glass.svg) !important;
++    fill-opacity: 0.5;
    }
  }
  

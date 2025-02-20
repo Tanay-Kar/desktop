@@ -1,17 +1,17 @@
 diff --git a/browser/base/content/browser.xhtml b/browser/base/content/browser.xhtml
-index 5dd337a2ffc9f9107d735f4dc96a50d57b12d213..58ecaf7136e13885ac38d74d40b5ef0f52cd7684 100644
+index 891c067d6ad718061c410c04743bed25744504b5..b7ded9691225068b23e4d6a5113242d0c0f5f842 100644
 --- a/browser/base/content/browser.xhtml
 +++ b/browser/base/content/browser.xhtml
-@@ -98,6 +98,8 @@
+@@ -99,6 +99,8 @@
  
-   <title data-l10n-id="browser-main-window-title"></title>
+   <title data-l10n-id="browser-main-window-default-title"></title>
  
 +#include zen-preloaded.inc.xhtml
 +
  # All JS files which are needed by browser.xhtml and other top level windows to
  # support MacOS specific features *must* go into the global-scripts.inc file so
  # that they can be shared with macWindow.inc.xhtml.
-@@ -141,6 +143,7 @@
+@@ -143,6 +145,7 @@
    window.addEventListener("DOMContentLoaded",
      gBrowserInit.onDOMContentLoaded.bind(gBrowserInit), { once: true });
  </script>
@@ -19,18 +19,19 @@ index 5dd337a2ffc9f9107d735f4dc96a50d57b12d213..58ecaf7136e13885ac38d74d40b5ef0f
  </head>
  <html:body xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
  # All sets except for popupsets (commands, keys, and stringbundles)
-@@ -162,9 +165,12 @@
+@@ -164,9 +167,13 @@
      </vbox>
    </html:template>
  
 -#include navigator-toolbox.inc.xhtml
 -
 -#include browser-box.inc.xhtml
-+  <hbox id="zen-main-app-wrapper" flex="1">
++  <hbox id="zen-main-app-wrapper" flex="1" persist="zen-compact-mode">
++    <vbox id="zen-toast-container"></vbox>
 +    #include navigator-toolbox.inc.xhtml
 +    <html:span id="zen-sidebar-box-container">
 +    </html:span>
-+    #include browser-box.inc.xhtml    
++    #include browser-box.inc.xhtml
 +  </hbox>
  
    <html:template id="customizationPanel">

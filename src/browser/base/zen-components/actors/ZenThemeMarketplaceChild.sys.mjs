@@ -6,11 +6,40 @@ export class ZenThemeMarketplaceChild extends JSWindowActorChild {
   handleEvent(event) {
     switch (event.type) {
       case 'DOMContentLoaded':
-        this.initiateThemeMarketplace();
-        this.contentWindow.document.addEventListener('ZenCheckForThemeUpdates', this.checkForThemeUpdates.bind(this));
+        this.initalizeZenAPI(event);
         break;
       default:
     }
+  }
+
+  initalizeZenAPI(event) {
+    const verifier = this.contentWindow.document.querySelector('meta[name="zen-content-verified"]');
+
+    if (verifier) {
+      verifier.setAttribute('content', 'verified');
+    }
+
+    const possibleRicePage = this.collectRiceMetadata();
+
+    if (possibleRicePage?.id) {
+      this.sendAsyncMessage('ZenThemeMarketplace:RicePage', possibleRicePage);
+      return;
+    }
+
+    this.initiateThemeMarketplace();
+    this.contentWindow.document.addEventListener('ZenCheckForThemeUpdates', this.checkForThemeUpdates.bind(this));
+  }
+
+  collectRiceMetadata() {
+    const meta = this.contentWindow.document.querySelector('meta[name="zen-rice-data"]');
+    if (meta) {
+      return {
+        id: meta.getAttribute('data-id'),
+        name: meta.getAttribute('data-name'),
+        author: meta.getAttribute('data-author'),
+      };
+    }
+    return null;
   }
 
   // This function will be caleld from about:preferences
@@ -22,6 +51,7 @@ export class ZenThemeMarketplaceChild extends JSWindowActorChild {
   initiateThemeMarketplace() {
     this.contentWindow.setTimeout(() => {
       this.addIntallButtons();
+      this.injectMarkplaceAPI();
     }, 0);
   }
 
@@ -29,7 +59,7 @@ export class ZenThemeMarketplaceChild extends JSWindowActorChild {
     return this.contentWindow.document.getElementById('install-theme');
   }
 
-  get actionButtonUnnstall() {
+  get actionButtonUninstall() {
     return this.contentWindow.document.getElementById('install-theme-uninstall');
   }
 
@@ -38,10 +68,12 @@ export class ZenThemeMarketplaceChild extends JSWindowActorChild {
       case 'ZenThemeMarketplace:ThemeChanged': {
         const themeId = message.data.themeId;
         const actionButton = this.actionButton;
-        const actionButtonInstalled = this.actionButtonUnnstall;
+        const actionButtonInstalled = this.actionButtonUninstall;
+
         if (actionButton && actionButtonInstalled) {
           actionButton.disabled = false;
           actionButtonInstalled.disabled = false;
+
           if (await this.isThemeInstalled(themeId)) {
             actionButton.classList.add('hidden');
             actionButtonInstalled.classList.remove('hidden');
@@ -50,26 +82,38 @@ export class ZenThemeMarketplaceChild extends JSWindowActorChild {
             actionButtonInstalled.classList.add('hidden');
           }
         }
+
         break;
       }
+
       case 'ZenThemeMarketplace:CheckForUpdatesFinished': {
         const updates = message.data.updates;
+
         this.contentWindow.document.dispatchEvent(
           new CustomEvent('ZenThemeMarketplace:CheckForUpdatesFinished', { detail: { updates } })
         );
+
         break;
       }
+
       case 'ZenThemeMarketplace:GetThemeInfo': {
         const themeId = message.data.themeId;
         const theme = await this.getThemeInfo(themeId);
+
         return theme;
       }
     }
   }
 
+  injectMarkplaceAPI() {
+    Cu.exportFunction(this.installTheme.bind(this), this.contentWindow, {
+      defineAs: 'ZenInstallTheme',
+    });
+  }
+
   async addIntallButtons() {
     const actionButton = this.actionButton;
-    const actionButtonUnnstall = this.actionButtonUnnstall;
+    const actionButtonUnnstall = this.actionButtonUninstall;
     const errorMessage = this.contentWindow.document.getElementById('install-theme-error');
     if (!actionButton || !actionButtonUnnstall) {
       return;
@@ -102,7 +146,6 @@ export class ZenThemeMarketplaceChild extends JSWindowActorChild {
 
   async getThemeInfo(themeId) {
     const url = this.getThemeAPIUrl(themeId);
-    console.info('ZTM: Fetching theme info from: ', url);
     const data = await fetch(url, {
       mode: 'no-cors',
     });
@@ -122,14 +165,19 @@ export class ZenThemeMarketplaceChild extends JSWindowActorChild {
     const button = event.target;
     button.disabled = true;
     const themeId = button.getAttribute('zen-theme-id');
-    console.info('ZTM: Uninstalling theme with id: ', themeId);
     this.sendAsyncMessage('ZenThemeMarketplace:UninstallTheme', { themeId });
   }
 
-  async installTheme(event) {
-    const button = event.target;
-    button.disabled = true;
-    const themeId = button.getAttribute('zen-theme-id');
+  async installTheme(object) {
+    // Object can be an event or a theme id
+    let themeId;
+    if (object.target) {
+      const button = object.target;
+      button.disabled = true;
+      themeId = button.getAttribute('zen-theme-id');
+    } else {
+      themeId = object.themeId;
+    }
     console.info('ZTM: Installing theme with id: ', themeId);
 
     const theme = await this.getThemeInfo(themeId);

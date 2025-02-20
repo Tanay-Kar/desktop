@@ -167,7 +167,7 @@ var gZenMarketplaceManager = {
     const browser = ZenMultiWindowFeature.currentBrowser;
     const themeList = document.createElement('div');
 
-    for (const theme of Object.values(themes)) {
+    for (const theme of Object.values(themes).sort((a, b) => a.name.localeCompare(b.name))) {
       const sanitizedName = `theme-${theme.name?.replaceAll(/\s/g, '-')?.replaceAll(/[^A-z_-]+/g, '')}`;
       const isThemeEnabled = theme.enabled === undefined || theme.enabled;
 
@@ -292,7 +292,7 @@ var gZenMarketplaceManager = {
         preferencesWrapper.setAttribute('flex', '1');
 
         for (const entry of preferences) {
-          const { property, label, type, placeholder } = entry;
+          const { property, label, type, placeholder, defaultValue } = entry;
 
           switch (type) {
             case 'dropdown': {
@@ -309,7 +309,7 @@ var gZenMarketplaceManager = {
               menulist.setAttribute('sizetopopup', 'none');
               menulist.setAttribute('id', property + '-popup-menulist');
 
-              const savedValue = Services.prefs.getStringPref(property, 'none');
+              const savedValue = Services.prefs.getStringPref(property, defaultValue ?? 'none');
 
               menulist.setAttribute('value', savedValue);
               menulist.setAttribute('tooltiptext', property);
@@ -395,7 +395,7 @@ var gZenMarketplaceManager = {
               checkboxElement.setAttribute('zen-pref', property);
 
               // Checkbox only works with "true" and "false" values, it's not like HTML checkboxes.
-              if (Services.prefs.getBoolPref(property, false)) {
+              if (Services.prefs.getBoolPref(property, defaultValue ?? false)) {
                 checkboxElement.setAttribute('checked', 'true');
               }
 
@@ -423,7 +423,7 @@ var gZenMarketplaceManager = {
               container.setAttribute('align', 'center');
               container.setAttribute('role', 'group');
 
-              const savedValue = Services.prefs.getStringPref(property, '');
+              const savedValue = Services.prefs.getStringPref(property, defaultValue ?? '');
               const sanitizedProperty = property?.replaceAll(/\./g, '-');
 
               const input = document.createElement('input');
@@ -440,7 +440,7 @@ var gZenMarketplaceManager = {
 
               input.addEventListener(
                 'input',
-                ZenThemesCommon.throttle((event) => {
+                ZenThemesCommon.debounce((event) => {
                   const value = event.target.value;
 
                   Services.prefs.setStringPref(property, value);
@@ -485,66 +485,62 @@ var gZenMarketplaceManager = {
   },
 };
 
+const kZenExtendedSidebar = 'zen.view.sidebar-expanded';
+const kZenSingleToolbar = 'zen.view.use-single-toolbar';
+
 var gZenLooksAndFeel = {
   init() {
     if (this.__hasInitialized) return;
     this.__hasInitialized = true;
     this._initializeColorPicker(this._getInitialAccentColor());
     window.zenPageAccentColorChanged = this._handleAccentColorChange.bind(this);
-    this._initializeTabbarExpandForm();
-    gZenThemeBuilder.init();
     gZenMarketplaceManager.init();
-    var onPreferColorSchemeChange = this.onPreferColorSchemeChange.bind(this);
-    window.matchMedia('(prefers-color-scheme: dark)').addListener(onPreferColorSchemeChange);
-    this.onPreferColorSchemeChange();
-    window.addEventListener('unload', () => {
-      window.matchMedia('(prefers-color-scheme: dark)').removeListener(onPreferColorSchemeChange);
-    });
-    this.setDarkThemeListener();
-    this.setCompactModeStyle();
-  },
-
-  onPreferColorSchemeChange(event) {
-    const darkTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    let elem = document.getElementById('ZenDarkThemeStyles');
-    if (darkTheme) {
-      elem.removeAttribute('hidden');
-    } else {
-      elem.setAttribute('hidden', 'true');
+    for (const pref of [kZenExtendedSidebar, kZenSingleToolbar]) {
+      Services.prefs.addObserver(pref, this);
     }
+    window.addEventListener('unload', () => {
+      for (const pref of [kZenExtendedSidebar, kZenSingleToolbar]) {
+        Services.prefs.removeObserver(pref, this);
+      }
+    });
+    this.setCompactModeStyle();
+
+    this.applySidebarLayout();
   },
 
-  setDarkThemeListener() {
-    const chooser = document.getElementById('zen-dark-theme-styles-form');
-    const radios = [...chooser.querySelectorAll('input')];
-    for (let radio of radios) {
-      if (radio.value === 'amoled' && Services.prefs.getBoolPref('zen.theme.color-prefs.amoled')) {
-        radio.checked = true;
-      } else if (radio.value === 'colorful' && Services.prefs.getBoolPref('zen.theme.color-prefs.colorful')) {
-        radio.checked = true;
-      } else if (
-        radio.value === 'default' &&
-        !Services.prefs.getBoolPref('zen.theme.color-prefs.amoled') &&
-        !Services.prefs.getBoolPref('zen.theme.color-prefs.colorful')
-      ) {
-        radio.checked = true;
+  observe(subject, topic, data) {
+    this.applySidebarLayout();
+  },
+
+  applySidebarLayout() {
+    const isSingleToolbar = Services.prefs.getBoolPref(kZenSingleToolbar);
+    const isExtendedSidebar = Services.prefs.getBoolPref(kZenExtendedSidebar);
+    for (const layout of document.getElementById('zenLayoutList').children) {
+      layout.classList.remove('selected');
+      if (layout.getAttribute('layout') == 'single' && isSingleToolbar) {
+        layout.classList.add('selected');
+      } else if (layout.getAttribute('layout') == 'multiple' && !isSingleToolbar && isExtendedSidebar) {
+        layout.classList.add('selected');
+      } else if (layout.getAttribute('layout') == 'collapsed' && !isExtendedSidebar) {
+        layout.classList.add('selected');
       }
-      radio.addEventListener('change', (e) => {
-        let value = e.target.value;
-        switch (value) {
-          case 'amoled':
-            Services.prefs.setBoolPref('zen.theme.color-prefs.amoled', true);
-            Services.prefs.setBoolPref('zen.theme.color-prefs.colorful', false);
-            break;
-          case 'colorful':
-            Services.prefs.setBoolPref('zen.theme.color-prefs.amoled', false);
-            Services.prefs.setBoolPref('zen.theme.color-prefs.colorful', true);
-            break;
-          default:
-            Services.prefs.setBoolPref('zen.theme.color-prefs.amoled', false);
-            Services.prefs.setBoolPref('zen.theme.color-prefs.colorful', false);
-            break;
+    }
+    if (this.__hasInitializedLayout) return;
+    this.__hasInitializedLayout = true;
+    for (const layout of document.getElementById('zenLayoutList').children) {
+      layout.addEventListener('click', () => {
+        if (layout.hasAttribute('disabled')) {
+          return;
         }
+
+        for (const el of document.getElementById('zenLayoutList').children) {
+          el.classList.remove('selected');
+        }
+
+        layout.classList.add('selected');
+
+        Services.prefs.setBoolPref(kZenExtendedSidebar, layout.getAttribute('layout') != 'collapsed');
+        Services.prefs.setBoolPref(kZenSingleToolbar, layout.getAttribute('layout') == 'single');
       });
     }
   },
@@ -555,25 +551,19 @@ var gZenLooksAndFeel = {
 
     let value = '';
     if (
-      Services.prefs.getBoolPref('zen.view.compact.hide-tabbar') &&
-      Services.prefs.getBoolPref('zen.view.compact.hide-toolbar')
+      Services.prefs.getBoolPref('zen.view.compact.hide-tabbar', false) &&
+      Services.prefs.getBoolPref('zen.view.compact.hide-toolbar', false)
     ) {
       value = 'both';
     } else {
       value = Services.prefs.getBoolPref('zen.view.compact.hide-tabbar') ? 'left' : 'top';
     }
     chooser.querySelector(`[value='${value}']`).checked = true;
-    const disableExpandTabsOnHover = () => {
-      if (Services.prefs.getBoolPref('zen.view.sidebar-expanded.on-hover')) {
-        document.querySelector(`#zen-expand-tabbar-strat input[value='expand']`).click();
-      }
-    };
     for (let radio of radios) {
       radio.addEventListener('change', (e) => {
         let value = e.target.value;
         switch (value) {
           case 'left':
-            disableExpandTabsOnHover();
             Services.prefs.setBoolPref('zen.view.compact.hide-tabbar', true);
             Services.prefs.setBoolPref('zen.view.compact.hide-toolbar', false);
             break;
@@ -582,50 +572,8 @@ var gZenLooksAndFeel = {
             Services.prefs.setBoolPref('zen.view.compact.hide-toolbar', true);
             break;
           default:
-            disableExpandTabsOnHover();
             Services.prefs.setBoolPref('zen.view.compact.hide-tabbar', true);
             Services.prefs.setBoolPref('zen.view.compact.hide-toolbar', true);
-            break;
-        }
-      });
-    }
-  },
-
-  _initializeTabbarExpandForm() {
-    const form = document.getElementById('zen-expand-tabbar-strat');
-    const radios = form.querySelectorAll('input[type=radio]');
-    const onHoverPref = 'zen.view.sidebar-expanded.on-hover';
-    const defaultExpandPref = 'zen.view.sidebar-expanded';
-    if (Services.prefs.getBoolPref(onHoverPref)) {
-      form.querySelector('input[value="hover"]').checked = true;
-    } else if (Services.prefs.getBoolPref(defaultExpandPref)) {
-      form.querySelector('input[value="expand"]').checked = true;
-    } else {
-      form.querySelector('input[value="none"]').checked = true;
-    }
-    const disableCompactTabbar = () => {
-      const toolbarEnable = Services.prefs.getBoolPref('zen.view.compact.hide-toolbar');
-      if (toolbarEnable) {
-        document.querySelector(`#ZenCompactModeStyle input[value='top']`).click();
-      } else if (Services.prefs.getBoolPref('zen.view.compact')) {
-        document.getElementById('zenLooksAndFeelShowCompactView').click();
-      }
-    };
-    for (let radio of radios) {
-      radio.addEventListener('change', (e) => {
-        switch (e.target.value) {
-          case 'expand':
-            Services.prefs.setBoolPref(onHoverPref, false);
-            Services.prefs.setBoolPref(defaultExpandPref, true);
-            break;
-          case 'none':
-            Services.prefs.setBoolPref(onHoverPref, false);
-            Services.prefs.setBoolPref(defaultExpandPref, false);
-            break;
-          case 'hover':
-            disableCompactTabbar();
-            Services.prefs.setBoolPref(onHoverPref, true);
-            Services.prefs.setBoolPref(defaultExpandPref, false);
             break;
         }
       });
@@ -673,30 +621,14 @@ var gZenWorkspacesSettings = {
         }
       },
     };
-    Services.prefs.addObserver('zen.workspaces.enabled', this);
     Services.prefs.addObserver('zen.tab-unloader.enabled', tabsUnloaderPrefListener);
     Services.prefs.addObserver('zen.glance.enabled', tabsUnloaderPrefListener); // We can use the same listener for both prefs
     Services.prefs.addObserver('zen.glance.activation-method', tabsUnloaderPrefListener);
     window.addEventListener('unload', () => {
-      Services.prefs.removeObserver('zen.workspaces.enabled', this);
       Services.prefs.removeObserver('zen.tab-unloader.enabled', tabsUnloaderPrefListener);
       Services.prefs.removeObserver('zen.glance.enabled', tabsUnloaderPrefListener);
       Services.prefs.removeObserver('zen.glance.activation-method', tabsUnloaderPrefListener);
     });
-  },
-
-  async observe(subject, topic, data) {
-    await this.onWorkspaceChange(Services.prefs.getBoolPref('zen.workspaces.enabled'));
-  },
-
-  async onWorkspaceChange(checked) {
-    if (checked) {
-      let buttonIndex = await confirmRestartPrompt(true, 1, true, false);
-      if (buttonIndex == CONFIRM_RESTART_PROMPT_RESTART_NOW) {
-        Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart);
-        return;
-      }
-    }
   },
 };
 
@@ -736,6 +668,23 @@ var zenMissingKeyboardShortcutL10n = {
 
   goHome: 'zen-key-go-home',
   key_redo: 'zen-key-redo',
+
+  key_inspectorMac: 'zen-key-inspector-mac',
+
+  // Devtools
+  key_toggleToolbox: 'zen-devtools-toggle-shortcut',
+  key_browserToolbox: 'zen-devtools-toggle-browser-toolbox-shortcut',
+  key_browserConsole: 'zen-devtools-toggle-browser-console-shortcut',
+  key_responsiveDesignMode: 'zen-devtools-toggle-responsive-design-mode-shortcut',
+  key_inspector: 'zen-devtools-toggle-inspector-shortcut',
+  key_webconsole: 'zen-devtools-toggle-web-console-shortcut',
+  key_jsdebugger: 'zen-devtools-toggle-js-debugger-shortcut',
+  key_netmonitor: 'zen-devtools-toggle-net-monitor-shortcut',
+  key_styleeditor: 'zen-devtools-toggle-style-editor-shortcut',
+  key_performance: 'zen-devtools-toggle-performance-shortcut',
+  key_storage: 'zen-devtools-toggle-storage-shortcut',
+  key_dom: 'zen-devtools-toggle-dom-shortcut',
+  key_accessibility: 'zen-devtools-toggle-accessibility-shortcut',
 };
 
 var gZenCKSSettings = {
@@ -848,7 +797,7 @@ var gZenCKSSettings = {
           if (!target.nextElementSibling) {
             target.after(
               window.MozXULElement.parseXULToFragment(`
-              <label class="${ZEN_CKS_CLASS_BASE}-unsafed" data-l10n-id="zen-key-unsafed"></label>
+              <label class="${ZEN_CKS_CLASS_BASE}-unsafed" data-l10n-id="zen-key-unsaved"></label>
             `)
             );
             target.value = 'Not set';
@@ -981,32 +930,12 @@ Preferences.addAll([
     default: true,
   },
   {
-    id: 'zen.view.compact',
-    type: 'bool',
-    default: false,
-  },
-  {
     id: 'zen.view.compact.hide-toolbar',
     type: 'bool',
     default: false,
   },
   {
     id: 'zen.view.compact.toolbar-flash-popup',
-    type: 'bool',
-    default: true,
-  },
-  {
-    id: 'zen.workspaces.enabled',
-    type: 'bool',
-    default: true,
-  },
-  {
-    id: 'zen.view.sidebar-expanded',
-    type: 'bool',
-    default: true,
-  },
-  {
-    id: 'zen.theme.pill-button',
     type: 'bool',
     default: true,
   },
@@ -1041,11 +970,6 @@ Preferences.addAll([
     default: 10,
   },
   {
-    id: 'zen.view.show-bottom-border',
-    type: 'bool',
-    default: false,
-  },
-  {
     id: 'zen.workspaces.hide-deactivated-workspaces',
     type: 'bool',
     default: true,
@@ -1076,48 +1000,58 @@ Preferences.addAll([
     default: false,
   },
   {
-    id: "zen.glance.activation-method",
-    type: "string",
-    default: "ctrl", 
+    id: 'zen.glance.activation-method',
+    type: 'string',
+    default: 'ctrl',
   },
   {
-    id: "zen.glance.enabled",
-    type: "bool",
+    id: 'zen.glance.enabled',
+    type: 'bool',
     default: true,
   },
   {
-    id: "zen.theme.color-prefs.use-workspace-colors",
-    type: "bool",
+    id: 'zen.theme.color-prefs.use-workspace-colors',
+    type: 'bool',
     default: false,
   },
   {
-    id: "zen.view.compact.color-toolbar",
-    type: "bool",
+    id: 'zen.view.compact.color-toolbar',
+    type: 'bool',
     default: true,
   },
   {
-    id: "zen.view.compact.color-sidebar",
-    type: "bool",
+    id: 'zen.urlbar.behavior',
+    type: 'string',
+    default: 'float',
+  },
+  {
+    id: 'zen.view.compact.color-sidebar',
+    type: 'bool',
     default: true,
   },
   {
-    id: "zen.essentials.enabled",
-    type: "bool",
+    id: 'zen.essentials.enabled',
+    type: 'bool',
     default: true,
   },
   {
-    id: "zen.tabs.show-newtab-vertical",
-    type: "bool",
-    default: true,
-  },
-  {
-    id: "zen.view.show-newtab-button-border-top",
-    type: "bool",
+    id: 'zen.workspaces.container-specific-essentials-enabled',
+    type: 'bool',
     default: false,
   },
   {
-    id: "zen.view.show-newtab-button-top",
-    type: "bool",
+    id: 'zen.tabs.show-newtab-vertical',
+    type: 'bool',
+    default: true,
+  },
+  {
+    id: 'zen.view.show-newtab-button-border-top',
+    type: 'bool',
+    default: false,
+  },
+  {
+    id: 'zen.view.show-newtab-button-top',
+    type: 'bool',
     default: true,
   },
 ]);
