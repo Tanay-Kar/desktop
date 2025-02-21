@@ -45,17 +45,21 @@
       const tab = window.gBrowser.addTrustedTab(url, {
         inBackground: true,
       });
-      gBrowser.pinTab(tab);
+      setTimeout(
+        (tab) => {
+          gBrowser.pinTab(tab);
+        },
+        1000,
+        tab
+      );
     }
   }
 
   function openWelcomeTab() {
-    const currentSelectedTab = window.gBrowser.selectedTab;
     const tab = window.gBrowser.addTrustedTab('https://zen-browser.app/welcome', {
       inBackground: true,
     });
     gBrowser.selectedTab = tab;
-    gBrowser.removeTab(currentSelectedTab);
   }
 
   class ZenWelcomePages {
@@ -425,7 +429,13 @@
             const createdTab = window.gBrowser.addTrustedTab(url, {
               inBackground: true,
             });
-            gZenPinnedTabManager.addToEssentials(createdTab);
+            setTimeout(
+              (tab) => {
+                gZenPinnedTabManager.addToEssentials(tab);
+              },
+              1000,
+              createdTab
+            );
           }
           openInitialPinTab();
           openWelcomeTab();

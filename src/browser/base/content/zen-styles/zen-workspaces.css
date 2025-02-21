@@ -478,11 +478,9 @@
   max-height: var(--zen-workspace-indicator-height);
   min-height: var(--zen-workspace-indicator-height);
   gap: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   align-items: center;
   flex-direction: row !important;
+  max-width: 100%;
 
   &::before {
     border-radius: var(--border-radius-medium);
@@ -512,6 +510,9 @@
   .zen-current-workspace-indicator-name {
     opacity: 0.5;
     display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
